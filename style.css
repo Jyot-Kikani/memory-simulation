@@ -1,193 +1,227 @@
+/* --- Base Dark Theme Styles --- */
 body {
     font-family: sans-serif;
     line-height: 1.6;
     margin: 20px;
-    background-color: #f4f4f4;
+    background-color: #2d2d2d; /* Dark background */
+    color: #cccccc; /* Light default text */
 }
 
 h1, h2 {
     text-align: center;
-    color: #333;
+    color: #e0e0e0; /* Slightly brighter text for headers */
+    margin-bottom: 15px;
+    font-weight: normal;
 }
 
-.controls {
+/* --- Main Layout (No color changes needed typically) --- */
+.main-layout {
     display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    background-color: #e0e0e0;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.layout-column {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.layout-left {
+    flex: 1 0 60px;
+}
+
+.layout-center {
+    flex: 1 5 auto;
+    min-width: 300px;
+}
+
+.layout-right {
+     flex: 1 0 100px;
+}
+
+/* --- Controls (Left Column - Dark) --- */
+.controls {
+    background-color: #383838; /* Darker container background */
     padding: 15px;
     border-radius: 8px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    /* Use a subtle light border or shadow if desired */
+    /* box-shadow: 0 1px 3px rgba(255, 255, 255, 0.1); */
+    border: 1px solid #555; /* Dark border */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .controls fieldset {
-    border: 1px solid #ccc;
+    border: 1px solid #5a5a5a; /* Slightly lighter border for fieldset */
     border-radius: 5px;
     padding: 10px 15px;
-    margin: 5px;
-    min-width: 250px;
+    margin-bottom: 15px;
+    background-color: #404040; /* Slightly different dark for fieldsets */
 }
+.controls fieldset:last-child {
+    margin-bottom: 0;
+}
+
 
 .controls legend {
     font-weight: bold;
-    color: #555;
+    color: #b0b0b0; /* Lighter grey for legend */
+    padding: 0 5px;
 }
 
 .controls label {
     display: inline-block;
-    margin-bottom: 5px;
-    min-width: 120px; /* Align labels */
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    width: 90px;
+    vertical-align: middle;
+    color: #cccccc; /* Ensure labels are light */
 }
 
 .controls input[type="text"],
 .controls input[type="number"],
 .controls select {
     padding: 8px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
+    margin-bottom: 8px;
+    border: 1px solid #777; /* Lighter border for inputs */
     border-radius: 4px;
-    width: calc(100% - 140px); /* Adjust width considering label */
+    width: calc(100% - 105px);
     box-sizing: border-box;
+    vertical-align: middle;
+    background-color: #555; /* Dark input background */
+    color: #eeeeee; /* Light input text */
 }
+.controls input::placeholder { /* Style placeholder text */
+    color: #999;
+}
+
+/* Focused inputs */
+.controls input[type="text"]:focus,
+.controls input[type="number"]:focus,
+.controls select:focus {
+    outline: none;
+    border-color: #9fa8da; /* Light blue/purple focus indicator */
+    box-shadow: 0 0 0 2px rgba(159, 168, 218, 0.3);
+}
+
 
 .controls button {
     padding: 10px 15px;
-    background-color: #5cb85c;
-    color: white;
+    color: #ffffff; /* White text on buttons */
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, box-shadow 0.2s ease;
     margin-right: 5px;
+    margin-top: 5px;
+    display: inline-block;
+    width: calc(50% - 8px);
+    box-sizing: border-box;
+    font-weight: bold;
+}
+/* Dark Theme Button Colors */
+#start-button { background-color: #388e3c; } /* Dark Green */
+#stop-button { background-color: #c62828; } /* Dark Red */
+#defragment-button { background-color: #d87f0a; } /* Dark Orange/Brown */
+#add-process-button {
+     width: 100%;
+     margin-top: 10px;
+     background-color: #0277bd; /* Dark Blue */
 }
 
-.controls button:hover {
-    background-color: #4cae4c;
+
+.controls button:hover:not(:disabled) {
+    filter: brightness(1.2); /* Make slightly brighter on hover */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .controls button:disabled {
-    background-color: #cccccc;
+    background-color: #555555; /* Darker grey for disabled */
+    color: #999999; /* Muted text */
     cursor: not-allowed;
-}
-
-#stop-button {
-     background-color: #d9534f;
-}
-#stop-button:hover:not(:disabled) {
-     background-color: #c9302c;
+    filter: brightness(0.8);
 }
 
 .status-running {
-    color: green;
+    color: #81c784; /* Brighter green for status */
     font-weight: bold;
+    display: block;
+    margin-top: 10px;
 }
 .status-stopped {
-    color: red;
+    color: #e57373; /* Brighter red for status */
     font-weight: bold;
+     display: block;
+    margin-top: 10px;
 }
 
 .error {
-    color: red;
+    color: #ef5350; /* Bright red for errors */
     font-size: 0.9em;
     margin-top: 5px;
-    min-height: 1.2em; /* Prevent layout shifts */
+    min-height: 1.2em;
 }
 
-.simulation-area {
-    display: flex;
-    gap: 20px; /* Space between queue, memory, exited */
-    margin-top: 20px;
-    align-items: flex-start; /* Align tops */
-}
-
-.queue-section, .exited-section {
-    background-color: #fff;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    min-width: 250px;
-    max-width: 300px; /* Limit width */
-}
-
-.queue-section ul, .exited-section ul {
-    list-style-type: none;
-    padding: 0;
-    max-height: 400px; /* Limit height and allow scrolling */
-    overflow-y: auto;
-}
-
-.queue-section li, .exited-section li {
-    background-color: #f9f9f9;
-    border: 1px solid #eee;
-    padding: 8px;
-    margin-bottom: 5px;
-    border-radius: 4px;
-    font-size: 0.9em;
-}
-
-.memory-section {
-    display: flex;
-    flex-grow: 1; /* Allow memory section to take remaining space */
-    gap: 20px;
-}
-
+/* --- Memory (Center Column - Dark) --- */
 .memory-container {
-    flex: 1; /* Each memory grid takes equal space */
-    background-color: #fff;
+    flex: 1;
+    background-color: #383838; /* Match controls background */
     padding: 15px;
     border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid #555; /* Match controls border */
     display: flex;
-    flex-direction: column; /* Stack title, grid, info */
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
 }
 .memory-container h2 {
     margin-top: 0;
 }
 
 .memory-grid {
-    border: 2px solid #333;
-    height: 500px; /* Fixed height for visualization */
-    position: relative; /* For positioning blocks inside */
+    border: 2px solid #666; /* Slightly lighter border for grid */
+    height: 500px;
+    position: relative;
+    /* Dark theme background pattern */
     background: repeating-linear-gradient(
         45deg,
-        #f0f0f0,
-        #f0f0f0 10px,
-        #e8e8e8 10px,
-        #e8e8e8 20px
-    ); /* Subtle background for empty space */
-     overflow: hidden; /* Hide potential overflow */
-     display: flex; /* Use flexbox to stack blocks */
-     flex-direction: column;
+        #3a3a3a,
+        #3a3a3a 10px,
+        #404040 10px,
+        #404040 20px
+    );
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .memory-info {
     text-align: center;
     margin-top: 10px;
     font-size: 0.9em;
-    color: #555;
+    color: #a0a0a0; /* Lighter grey for info text */
 }
 
-
-/* Memory Block Styles */
+/* Memory Block Styles - Dark */
 .memory-block {
-    border: 1px solid #666;
-    box-sizing: border-box; /* Include border in size */
+    border: 1px solid #666; /* Darker border for blocks */
+    box-sizing: border-box;
     display: flex;
-    flex-direction: column; /* Stack text inside */
-    justify-content: center; /* Center text vertically */
-    align-items: center; /* Center text horizontally */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     font-size: 0.8em;
     text-align: center;
-    overflow: hidden; /* Hide overflowing text */
-    position: relative; /* Needed for absolute timer */
-    transition: background-color 0.3s ease, border-color 0.3s ease; /* Smooth transitions */
+    overflow: hidden;
+    position: relative;
+    transition: background-color 0.3s ease, border-color 0.3s ease, height 0.5s ease-in-out;
 }
 
 .memory-block.free {
-    background-color: #c8e6c9; /* Light green for free */
-    border-color: #81c784;
-    color: #388e3c;
+    background-color: #425a43; /* Dark Greenish */
+    border-color: #6a8a6b;
+    color: #b8e0b9; /* Light Greenish Text */
 }
 .memory-block.free::before {
      content: "Free";
@@ -196,10 +230,10 @@ h1, h2 {
 
 
 .memory-block.allocated {
-    background-color: #bbdefb; /* Light blue for allocated */
-    border-color: #64b5f6;
-    color: #1976d2;
-    cursor: default; /* Indicate it's occupied */
+    background-color: #4a6f94; /* Dark Bluish */
+    border-color: #7a9fca;
+    color: #cce0ff; /* Light Bluish Text */
+    cursor: default;
     font-weight: bold;
 }
 
@@ -209,33 +243,83 @@ h1, h2 {
 
 .memory-block .process-timer {
     font-size: 0.9em;
-    color: #d32f2f; /* Red for timer */
+    color: #ffcc80; /* Light Orange/Yellow for timer */
     font-weight: normal;
     margin-top: 3px;
 }
 
-/* Style for static partitions that cannot be changed */
-.memory-block.static-partition.allocated {
-     background-color: #a5d6a7; /* Slightly different green for static allocated */
-     border-color: #4caf50;
-     color: #2e7d32;
-}
-.memory-block.static-partition.free {
-     background-color: #e0e0e0; /* Grey for free static */
-     border-color: #bdbdbd;
-     color: #616161;
-}
-.memory-block.static-partition.free::before {
-     content: "Partition Free";
-}
-
-
-/* Minimalistic Exit Animation (Color Flash) */
+/* Exit Animation - Dark */
 .memory-block.exiting {
-    animation: exitFlash 0.5s ease-out;
+    animation: exitFlashDark 0.5s ease-out;
 }
 
-@keyframes exitFlash {
-    0% { background-color: #ffcdd2; border-color: #ef9a9a; } /* Flash red */
+@keyframes exitFlashDark {
+    0% { background-color: #8c3a3a; border-color: #a85e5e; } /* Flash Dark Red */
     100% { /* Returns to original free color via JS update */ }
+}
+
+/* Defragmentation Animation Hint (optional) */
+.memory-block.defrag-moving {
+    transition: background-color 0.3s ease, border-color 0.3s ease, height 0.5s ease-in-out, transform 0.5s ease-in-out;
+    /* Could add a temporary light border */
+    /* border: 1px solid #eee; */
+}
+
+
+/* --- Queues (Right Column - Dark) --- */
+.queue-section, .exited-section {
+    background-color: #383838; /* Match controls background */
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #555; /* Match controls border */
+    width: 100%;
+    box-sizing: border-box;
+}
+.queue-section {
+    min-height: 200px;
+    max-height: 350px;
+    overflow-y: auto;
+}
+.exited-section {
+     min-height: 150px;
+     max-height: 250px;
+     overflow-y: auto;
+}
+
+/* --- Scrollbar Styling (Optional, Webkit browsers) --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #444;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #666;
+  border-radius: 4px;
+  border: 2px solid #444; /* Creates padding around thumb */
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #777;
+}
+
+
+.queue-section ul, .exited-section ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.queue-section li, .exited-section li {
+    background-color: #444444; /* Darker list item background */
+    border: 1px solid #5a5a5a; /* Slightly lighter border */
+    color: #cccccc; /* Light text for list items */
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.queue-section li:last-child, .exited-section li:last-child {
+    margin-bottom: 0;
 }

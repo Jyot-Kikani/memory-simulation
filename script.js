@@ -1,20 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Configuration ---
     const TOTAL_MEMORY_SIZE = 1024; // Total KB for dynamic memory
-    const STATIC_PARTITIONS = [ // Define fixed static partitions {id, size}
-        { id: 's1', size: 100 },
-        { id: 's2', size: 250 },
-        { id: 's3', size: 150 },
-        { id: 's4', size: 300 },
-        { id: 's5', size: 224 } // Ensure total matches display if needed
-    ];
+    // STATIC_PARTITIONS REMOVED
     const SIMULATION_TICK_MS = 1000; // Update interval in milliseconds
 
     // --- DOM Elements ---
     const allocationAlgorithmSelect = document.getElementById('allocation-algorithm');
-    // const timeQuantumInput = document.getElementById('time-quantum'); // Removed
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
+    const defragmentButton = document.getElementById('defragment-button'); // Added
     const statusDisplay = document.getElementById('status');
 
     const processNameInput = document.getElementById('process-name');
@@ -25,15 +19,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessageDiv = document.getElementById('error-message');
 
     const processQueueList = document.getElementById('process-queue-list');
-    const staticMemoryGrid = document.getElementById('static-memory');
+    // staticMemoryGrid REMOVED
     const dynamicMemoryGrid = document.getElementById('dynamic-memory');
     const exitedProcessList = document.getElementById('exited-process-list');
-    const staticTotalSizeSpan = document.getElementById('static-total-size');
+    // staticTotalSizeSpan REMOVED
     const dynamicTotalSizeSpan = document.getElementById('dynamic-total-size');
 
     // --- State Variables ---
-    let processQueue = []; // { id, name, priority, burstTime, size, timeLeft, state: 'waiting'/'running', allocatedBlockId: null, memoryType: null }
-    let staticMemory = []; // { id, size, isFree: true, processId: null }
+    let processQueue = []; // { id, name, priority, burstTime, size, timeLeft, state: 'waiting'/'running', allocatedBlockId: null }
+    let allProcesses = []; // Master list of all processes added
+    // staticMemory REMOVED
     let dynamicMemory = []; // { id, startAddress, size, isFree: true, processId: null }
     let nextProcessId = 1;
     let nextBlockId = 1; // For dynamic blocks
@@ -43,13 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     function initialize() {
         console.log("Initializing Simulation...");
-        // Initialize Static Memory
-        let staticTotal = 0;
-        staticMemory = STATIC_PARTITIONS.map(p => {
-             staticTotal += p.size;
-             return {...p, isFree: true, processId: null };
-        });
-        staticTotalSizeSpan.textContent = staticTotal;
+        processQueue = [];
+        allProcesses = [];
+        exitedProcesses = []; // Clear exited list too
+        nextProcessId = 1;
+        nextBlockId = 1;
 
         // Initialize Dynamic Memory (start with one large free block)
         dynamicMemory = [{
@@ -61,10 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }];
         dynamicTotalSizeSpan.textContent = TOTAL_MEMORY_SIZE;
 
-        renderMemory('static');
-        renderMemory('dynamic');
+        renderMemory(); // Removed 'static'/'dynamic' type argument
         renderQueue();
-        renderExitedList(); // Clear exited list on init
+        renderExitedList();
         updateControlButtonStates();
         console.log("Initialization Complete.");
     }
@@ -72,13 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Rendering Functions ---
     function renderQueue() {
         processQueueList.innerHTML = ''; // Clear current list
-        // Sort queue by priority (descending) then by ID (ascending for stability)
-        const sortedQueue = [...processQueue].sort((a, b) => {
-            if (b.priority !== a.priority) {
-                return b.priority - a.priority;
-            }
-            return a.id - b.id; // FIFO for same priority
-        });
+        const sortedQueue = [...processQueue]
+            .filter(p => p.state === 'waiting') // Only show waiting processes in queue list
+            .sort((a, b) => b.priority - a.priority || a.id - b.id);
 
         if (sortedQueue.length === 0) {
              processQueueList.innerHTML = '<li>Queue is empty</li>';
@@ -92,29 +80,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function renderMemory(type) {
-        const grid = (type === 'static') ? staticMemoryGrid : dynamicMemoryGrid;
-        const memory = (type === 'static') ? staticMemory : dynamicMemory;
-        const totalSize = (type === 'static') ? STATIC_PARTITIONS.reduce((sum, p) => sum + p.size, 0) : TOTAL_MEMORY_SIZE;
+    // Updated: Only renders dynamic memory
+    function renderMemory() {
+        const grid = dynamicMemoryGrid;
+        const memory = dynamicMemory;
+        const totalSize = TOTAL_MEMORY_SIZE;
 
         grid.innerHTML = ''; // Clear current grid
+         // Sort by address FOR RENDERING ORDER
+         memory.sort((a, b) => a.startAddress - b.startAddress);
 
         memory.forEach(block => {
             const blockDiv = document.createElement('div');
             blockDiv.classList.add('memory-block');
-            blockDiv.style.height = `${Math.max(1, (block.size / totalSize) * 100)}%`; // Use percentage height, ensure minimum visibility
-            blockDiv.dataset.blockId = block.id; // Store block ID for reference
+            blockDiv.style.height = `${Math.max(1, (block.size / totalSize) * 100)}%`;
+            blockDiv.dataset.blockId = block.id;
 
             if (block.isFree) {
                 blockDiv.classList.add('free');
-                if (type === 'static') blockDiv.classList.add('static-partition');
-                // Optionally display size for free blocks
-                // blockDiv.textContent = `Free: ${block.size}KB`;
+                 // blockDiv.textContent = `Free: ${block.size}KB`; // Optional: display size
             } else {
                 blockDiv.classList.add('allocated');
-                if (type === 'static') blockDiv.classList.add('static-partition');
-
-                const process = findProcessById(block.processId);
+                const process = findProcessByIdGlobal(block.processId); // Use global finder
                 if (process) {
                     const infoDiv = document.createElement('div');
                     infoDiv.classList.add('process-info');
@@ -127,22 +114,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     blockDiv.appendChild(infoDiv);
                     blockDiv.appendChild(timerDiv);
                 } else {
-                     // Should not happen in normal operation
-                     blockDiv.textContent = `Error: Process P${block.processId} not found!`;
+                     blockDiv.textContent = `Error: P${block.processId} not found!`;
                      blockDiv.style.backgroundColor = 'red';
                 }
             }
             grid.appendChild(blockDiv);
         });
-         // Add a small element to push flex items visually if grid is empty or nearly empty
-         if (memory.length === 0 || memory.every(b => b.isFree)) {
+
+        // Add filler if needed (less likely with dynamic but good practice)
+         if (memory.length === 0 || memory.every(b => b.isFree && memory.length === 1)) {
             const filler = document.createElement('div');
-            filler.style.flexGrow = '1'; // Take up remaining space
+            filler.style.flexGrow = '1';
             grid.appendChild(filler);
          }
     }
 
-     // Keep track of exited processes for display
      let exitedProcesses = [];
      function renderExitedList() {
         exitedProcessList.innerHTML = '';
@@ -150,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
             exitedProcessList.innerHTML = '<li>No processes finished yet</li>';
             return;
         }
-         // Display latest exited first
         exitedProcesses.slice().reverse().forEach(proc => {
              const li = document.createElement('li');
              li.textContent = `ID: ${proc.id}, Name: ${proc.name}, Size: ${proc.size}KB (Finished)`;
@@ -166,35 +151,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const burstTime = parseInt(processBurstInput.value);
         const size = parseInt(processSizeInput.value);
 
-        // Basic Validation
-        errorMessageDiv.textContent = ''; // Clear previous errors
-        if (!name) {
-            errorMessageDiv.textContent = 'Process name cannot be empty.';
-            return;
-        }
-        if (isNaN(priority) || priority < 1) {
-            errorMessageDiv.textContent = 'Priority must be a number >= 1.';
-            return;
-        }
-        if (isNaN(burstTime) || burstTime < 1) {
-            errorMessageDiv.textContent = 'Burst time must be a number >= 1.';
-            return;
-        }
-        if (isNaN(size) || size < 1) {
-            errorMessageDiv.textContent = 'Size must be a number >= 1.';
-            return;
+        errorMessageDiv.textContent = '';
+        if (!name || isNaN(priority) || priority < 1 || isNaN(burstTime) || burstTime < 1 || isNaN(size) || size < 1) {
+            errorMessageDiv.textContent = 'Invalid input. Please check values.';
+             return;
         }
          if (size > TOTAL_MEMORY_SIZE) {
-             errorMessageDiv.textContent = `Process size (${size}KB) exceeds total dynamic memory (${TOTAL_MEMORY_SIZE}KB).`;
+             errorMessageDiv.textContent = `Process size (${size}KB) exceeds total memory (${TOTAL_MEMORY_SIZE}KB).`;
              return;
          }
-         // Check if size exceeds largest static partition (optional but good)
-         const maxStaticSize = Math.max(...STATIC_PARTITIONS.map(p => p.size));
-          if (size > maxStaticSize) {
-             console.warn(`Process P${nextProcessId} (${size}KB) is too large for any static partition (Max: ${maxStaticSize}KB). It can only run in dynamic memory.`);
-             // Allow adding, but it might never run in static.
-         }
-
+         // Static partition check removed
 
         const newProcess = {
             id: nextProcessId++,
@@ -203,41 +169,39 @@ document.addEventListener('DOMContentLoaded', () => {
             burstTime: burstTime,
             size: size,
             timeLeft: burstTime,
-            state: 'waiting', // waiting, running, finished
-            allocatedBlockId: null,
-            memoryType: null // 'static' or 'dynamic'
+            state: 'waiting',
+            allocatedBlockId: null, // Will hold the ID of the dynamic block
+            // memoryType removed
+            // allocatedStaticBlockId / allocatedDynamicBlockId removed (use allocatedBlockId)
         };
 
-        processQueue.push(newProcess);
+        allProcesses.push(newProcess); // Add to master list
+        processQueue.push(newProcess); // Add to waiting queue
         console.log(`Process Added: ${JSON.stringify(newProcess)}`);
         renderQueue();
 
-        // Clear form
         processNameInput.value = '';
         processPriorityInput.value = '1';
         processBurstInput.value = '10';
         processSizeInput.value = '50';
 
-        // Try to allocate immediately if simulation is running or stopped (queue might have space)
-         attemptAllocation();
-
+        attemptAllocation(); // Try to allocate immediately
     }
 
-    // --- Memory Allocation Algorithms ---
+    // --- Memory Allocation Algorithms --- (No changes needed here, they operate on a memory array)
 
     function findFirstFit(process, memory) {
         for (let i = 0; i < memory.length; i++) {
             if (memory[i].isFree && memory[i].size >= process.size) {
-                return i; // Return index of the first suitable block
+                return i;
             }
         }
-        return -1; // Not found
+        return -1;
     }
 
     function findBestFit(process, memory) {
         let bestFitIndex = -1;
         let minSuitableSize = Infinity;
-
         for (let i = 0; i < memory.length; i++) {
             if (memory[i].isFree && memory[i].size >= process.size) {
                 if (memory[i].size < minSuitableSize) {
@@ -252,7 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function findWorstFit(process, memory) {
         let worstFitIndex = -1;
         let maxSuitableSize = -1;
-
         for (let i = 0; i < memory.length; i++) {
             if (memory[i].isFree && memory[i].size >= process.size) {
                 if (memory[i].size > maxSuitableSize) {
@@ -264,212 +227,50 @@ document.addEventListener('DOMContentLoaded', () => {
         return worstFitIndex;
     }
 
-    function allocateProcess(process, blockIndex, memoryType) {
-        const memory = (memoryType === 'static') ? staticMemory : dynamicMemory;
-        const block = memory[blockIndex];
+    // --- Allocation & Deallocation ---
 
-        console.log(`Allocating P${process.id} (${process.size}KB) to ${memoryType} Block ${block.id} (${block.size}KB)`);
-
-        const originalBlockSize = block.size;
-        const remainingSize = block.size - process.size;
-
-        // Update the allocated block
-        block.isFree = false;
-        block.processId = process.id;
-        block.size = process.size; // For dynamic, adjust size to fit process exactly
-
-        // Update process state
-        process.state = 'running';
-        process.allocatedBlockId = block.id;
-        process.memoryType = memoryType;
-
-        // Handle fragmentation in Dynamic Memory Only
-        if (memoryType === 'dynamic' && remainingSize > 0) {
-            const newHole = {
-                id: `b${nextBlockId++}`,
-                startAddress: block.startAddress + process.size,
-                size: remainingSize,
-                isFree: true,
-                processId: null
-            };
-            // Insert the new hole immediately after the allocated block
-            memory.splice(blockIndex + 1, 0, newHole);
-            console.log(`Dynamic Fragmentation: Created new hole ${newHole.id} (${newHole.size}KB)`);
-        } else if (memoryType === 'static' && remainingSize > 0) {
-             // Static partitions keep their original size, just mark as used
-             block.size = originalBlockSize; // Restore original size visually/logically
-             console.log(`Static Partition ${block.id}: Internal fragmentation of ${remainingSize}KB`);
-        }
-
-
-        // Remove process from queue visually (will be filtered out in next queue render)
-        // Might need a more robust way if allocation fails later for the other memory type
-        // Let's update the queue fully after attempting both allocations.
-
-        return true; // Allocation successful for this memory type
-    }
-
-     function deallocateProcess(processId) {
-        const process = findProcessByIdGlobal(processId); // Find in running state
-        if (!process || !process.allocatedBlockId || !process.memoryType) {
-            console.error(`Cannot deallocate: Process P${processId} not found or not allocated.`);
-            return;
-        }
-
-        const memoryType = process.memoryType;
-        const memory = (memoryType === 'static') ? staticMemory : dynamicMemory;
-        const blockId = process.allocatedBlockId;
-        const blockIndex = memory.findIndex(b => b.id === blockId);
-
-        if (blockIndex === -1) {
-            console.error(`Cannot deallocate: Block ${blockId} for P${processId} not found in ${memoryType} memory.`);
-            return;
-        }
-
-        const block = memory[blockIndex];
-        console.log(`Deallocating P${processId} from ${memoryType} Block ${block.id}`);
-
-         // Animate exit visually before removing
-         const grid = (memoryType === 'static') ? staticMemoryGrid : dynamicMemoryGrid;
-         const blockDiv = grid.querySelector(`[data-block-id="${block.id}"]`);
-         if (blockDiv) {
-             blockDiv.classList.add('exiting');
-         }
-
-
-        // Reset block state
-        block.isFree = true;
-        block.processId = null;
-        // For static memory, size remains fixed. For dynamic, size is already correct.
-
-         // Add to exited list
-         process.state = 'finished';
-         exitedProcesses.push({...process}); // Store a copy
-         renderExitedList();
-
-         // Remove from active processes (conceptually, actual removal from queue happened on allocation)
-
-
-        // Merge free blocks in Dynamic Memory ONLY
-        if (memoryType === 'dynamic') {
-            mergeFreeBlocks(memory, blockIndex);
-        }
-
-         // Render changes after a short delay for animation
-         setTimeout(() => {
-             renderMemory(memoryType);
-             // Crucial: After deallocation, try to allocate waiting processes
-             attemptAllocation();
-         }, 500); // Match animation duration if any
-
-    }
-
-     function mergeFreeBlocks(memory, freedBlockIndex) {
-        let currentBlock = memory[freedBlockIndex];
-
-        // Merge with NEXT block if it's free
-        if (freedBlockIndex + 1 < memory.length) {
-            let nextBlock = memory[freedBlockIndex + 1];
-            if (nextBlock.isFree) {
-                console.log(`Merging freed block ${currentBlock.id} with next block ${nextBlock.id}`);
-                currentBlock.size += nextBlock.size;
-                memory.splice(freedBlockIndex + 1, 1); // Remove the next block
-                 // No need to change startAddress
-            }
-        }
-
-        // Merge with PREVIOUS block if it's free
-        // Note: freedBlockIndex might be invalid if merged with next, so re-find or adjust index
-        // It's safer to check the block *before* the potentially modified currentBlock's position
-         let potentiallyNewIndex = memory.findIndex(b => b.id === currentBlock.id); // Find it again
-        if (potentiallyNewIndex > 0) {
-             let prevBlock = memory[potentiallyNewIndex - 1];
-             if (prevBlock.isFree) {
-                console.log(`Merging freed block ${currentBlock.id} with previous block ${prevBlock.id}`);
-                prevBlock.size += currentBlock.size;
-                // Start address of prevBlock remains the same
-                memory.splice(potentiallyNewIndex, 1); // Remove the current block
-             }
-        }
-        // No need to re-sort dynamic memory here as merges maintain order
-    }
-
-
+    // Simplified attemptAllocation for dynamic memory only
     function attemptAllocation() {
         console.log("Attempting Allocation...");
         const algorithm = allocationAlgorithmSelect.value;
         let allocationMade = false;
 
-         // Get a mutable copy of the queue sorted by priority
         let sortedQueue = processQueue
                             .filter(p => p.state === 'waiting')
                             .sort((a, b) => b.priority - a.priority || a.id - b.id);
 
-        let processesToRemoveFromQueue = [];
+        let processesToUpdateState = []; // Processes that get allocated in this pass
+
+        // Ensure dynamic memory is sorted by address before allocation attempts
+        dynamicMemory.sort((a, b) => a.startAddress - b.startAddress);
 
         for (let process of sortedQueue) {
-            if (process.state !== 'waiting') continue; // Skip already allocated or finished
+            if (process.state !== 'waiting') continue;
 
-            let allocatedStatic = false;
-            let allocatedDynamic = false;
-
-            // --- Try Static Allocation ---
-            let staticBlockIndex = -1;
-             const staticMemCopy = staticMemory; // Reference is fine here
-            if (algorithm === 'first') staticBlockIndex = findFirstFit(process, staticMemCopy);
-            else if (algorithm === 'best') staticBlockIndex = findBestFit(process, staticMemCopy);
-            else if (algorithm === 'worst') staticBlockIndex = findWorstFit(process, staticMemCopy);
-
-            if (staticBlockIndex !== -1) {
-                // Simulate allocation: mark block, update process (but maybe don't modify global state yet?)
-                 // For simulation, we apply to both if possible.
-                 // We need to *clone* the process if allocating to both, which complicates things.
-                 // Let's simplify: A process from the queue is allocated to ONE place (dynamic preferred if fits both?)
-                 // OR, the user wants to see the *effect* on both grids. Let's stick to the latter.
-                 // This means a process might appear in *both* grids if it fits.
-
-                 // We need separate tracking for allocation status per memory type
-                 process.allocatedStaticBlockId = null; // Reset flags
-                 process.allocatedDynamicBlockId = null;
-
-                 // Allocate to Static
-                 let staticMemBlock = staticMemory[staticBlockIndex];
-                 staticMemBlock.isFree = false;
-                 staticMemBlock.processId = process.id; // Link process to block
-                 process.allocatedStaticBlockId = staticMemBlock.id; // Link block to process for static
-                 allocationMade = true;
-                 console.log(`P${process.id} allocated to static block ${staticMemBlock.id}`);
-
-            } else {
-                 console.log(`P${process.id} could not fit in static memory.`);
-            }
-
-
-            // --- Try Dynamic Allocation ---
             let dynamicBlockIndex = -1;
-             // Sort dynamic memory by address before finding fit - important for consistency and merging logic
-             dynamicMemory.sort((a, b) => a.startAddress - b.startAddress);
-             const dynamicMemCopy = dynamicMemory; // Use the sorted version
 
-            if (algorithm === 'first') dynamicBlockIndex = findFirstFit(process, dynamicMemCopy);
-            else if (algorithm === 'best') dynamicBlockIndex = findBestFit(process, dynamicMemCopy);
-            else if (algorithm === 'worst') dynamicBlockIndex = findWorstFit(process, dynamicMemCopy);
+            if (algorithm === 'first') dynamicBlockIndex = findFirstFit(process, dynamicMemory);
+            else if (algorithm === 'best') dynamicBlockIndex = findBestFit(process, dynamicMemory);
+            else if (algorithm === 'worst') dynamicBlockIndex = findWorstFit(process, dynamicMemory);
 
             if (dynamicBlockIndex !== -1) {
-                 // Allocate dynamically (causes potential split)
                 const blockToAllocate = dynamicMemory[dynamicBlockIndex];
                 const originalSize = blockToAllocate.size;
                 const remainingSize = originalSize - process.size;
 
-                 blockToAllocate.isFree = false;
-                 blockToAllocate.processId = process.id;
-                 blockToAllocate.size = process.size; // Adjust size
+                console.log(`Allocating P${process.id} (${process.size}KB) to Dynamic Block ${blockToAllocate.id} (${originalSize}KB)`);
 
-                 process.allocatedDynamicBlockId = blockToAllocate.id; // Link block to process for dynamic
-                 allocationMade = true;
-                 console.log(`P${process.id} allocated to dynamic block ${blockToAllocate.id}`);
+                // Update the allocated block
+                blockToAllocate.isFree = false;
+                blockToAllocate.processId = process.id;
+                blockToAllocate.size = process.size; // Adjust block size to fit process exactly
 
-                 // Handle split
+                // Update process state
+                process.allocatedBlockId = blockToAllocate.id; // Store the block ID
+                processesToUpdateState.push(process.id); // Mark for state change
+                allocationMade = true;
+
+                 // Handle fragmentation: Create new hole if space remains
                  if (remainingSize > 0) {
                      const newHole = {
                          id: `b${nextBlockId++}`,
@@ -478,142 +279,238 @@ document.addEventListener('DOMContentLoaded', () => {
                          isFree: true,
                          processId: null
                      };
+                     // Insert the new hole immediately after the allocated block
                      dynamicMemory.splice(dynamicBlockIndex + 1, 0, newHole);
-                     console.log(`Dynamic split: Created hole ${newHole.id} (${newHole.size}KB)`);
+                     console.log(`Dynamic Fragmentation: Created new hole ${newHole.id} (${newHole.size}KB)`);
                  }
-             } else {
-                  console.log(`P${process.id} could not fit in dynamic memory.`);
-             }
-
-             // --- Update Process State ---
-             // If allocated to *either* static or dynamic, mark as running and remove from queue list
-             if (process.allocatedStaticBlockId || process.allocatedDynamicBlockId) {
-                 process.state = 'running';
-                 processesToRemoveFromQueue.push(process.id);
-             }
-
+                 // Allocation successful for this process, move to next in priority queue
+            } else {
+                 // console.log(`P${process.id} could not fit in dynamic memory currently.`);
+                 // Keep process in queue for next attempt
+            }
         } // End loop through sorted waiting queue
 
+        // Update the state of successfully allocated processes and remove from visual queue
+        if (processesToUpdateState.length > 0) {
+            processQueue = processQueue.map(p => {
+                if (processesToUpdateState.includes(p.id)) {
+                    return { ...p, state: 'running' };
+                }
+                return p;
+            }).filter(p => p.state !== 'running'); // Filter out allocated ones from queue visibility
 
-         // Remove allocated processes from the actual processQueue
-         processQueue = processQueue.filter(p => !processesToRemoveFromQueue.includes(p.id));
+             // Keep running processes in the master 'allProcesses' list
+             allProcesses = allProcesses.map(p => {
+                 if (processesToUpdateState.includes(p.id)) {
+                     const allocatedProcess = findProcessByIdGlobal(p.id); // Get the updated one
+                     return { ...p, state: 'running', allocatedBlockId: allocatedProcess.allocatedBlockId };
+                 }
+                 return p;
+             });
+        }
 
 
-        // Re-render everything if any allocation happened
+        // Re-render if changes occurred
         if (allocationMade) {
-            renderMemory('static');
-            renderMemory('dynamic');
+            renderMemory();
             renderQueue(); // Update queue display
         }
     }
 
+
+     // Simplified deallocateProcess for dynamic memory only
+     function deallocateProcess(processId) {
+        const process = findProcessByIdGlobal(processId);
+        if (!process || !process.allocatedBlockId) {
+            console.error(`Cannot deallocate: Process P${processId} not found or not allocated.`);
+            return;
+        }
+
+        const blockId = process.allocatedBlockId;
+        const blockIndex = dynamicMemory.findIndex(b => b.id === blockId);
+
+        if (blockIndex === -1) {
+            console.error(`Cannot deallocate: Block ${blockId} for P${processId} not found in dynamic memory.`);
+             // Maybe the process finished but block was already merged somehow? Clean up state.
+             process.state = 'finished';
+             if (!exitedProcesses.some(ep => ep.id === process.id)) {
+                 exitedProcesses.push({...process});
+                 renderExitedList();
+             }
+             // Remove from allProcesses? Or just keep as finished. Keep for now.
+            return;
+        }
+
+        const block = dynamicMemory[blockIndex];
+        console.log(`Deallocating P${processId} from Dynamic Block ${block.id}`);
+
+         // Animate exit
+         const blockDiv = dynamicMemoryGrid.querySelector(`[data-block-id="${block.id}"]`);
+         if (blockDiv) {
+             blockDiv.classList.add('exiting');
+         }
+
+        // Reset block state
+        block.isFree = true;
+        block.processId = null;
+        // Size was already adjusted on allocation, it's now a hole of that process's size
+
+         // Add to exited list (ensure it's done only once)
+         process.state = 'finished';
+         if (!exitedProcesses.some(ep => ep.id === process.id)) {
+            exitedProcesses.push({...process}); // Store a copy
+            renderExitedList();
+         }
+
+        // Merge free blocks
+        mergeFreeBlocks(dynamicMemory, blockIndex);
+
+         // Render changes after a short delay for animation
+         setTimeout(() => {
+             renderMemory();
+             // Crucial: After deallocation, try to allocate waiting processes
+             attemptAllocation();
+         }, 500); // Match animation duration if any
+    }
+
+     function mergeFreeBlocks(memory, freedBlockIndex) {
+        // Ensure memory is sorted by start address before merging for correctness
+        memory.sort((a, b) => a.startAddress - b.startAddress);
+        // Find the actual current index after sorting
+        const currentBlock = memory[freedBlockIndex]; // Block that just became free
+        const currentIndex = memory.findIndex(b => b.id === currentBlock.id);
+
+        if (currentIndex === -1) {
+            console.error("Error finding freed block after sorting for merge.");
+            return; // Should not happen
+        }
+
+        let blockToMerge = memory[currentIndex]; // Start with the block itself
+
+
+        // Merge with NEXT block if it's free
+        if (currentIndex + 1 < memory.length) {
+            let nextBlock = memory[currentIndex + 1];
+            if (nextBlock.isFree) {
+                console.log(`Merging freed block ${blockToMerge.id} with next block ${nextBlock.id}`);
+                blockToMerge.size += nextBlock.size;
+                memory.splice(currentIndex + 1, 1); // Remove the next block
+                 // The current block (blockToMerge) remains at currentIndex
+            }
+        }
+
+        // Merge with PREVIOUS block if it's free
+        if (currentIndex > 0) {
+             let prevBlock = memory[currentIndex - 1];
+             if (prevBlock.isFree) {
+                console.log(`Merging freed block ${blockToMerge.id} with previous block ${prevBlock.id}`);
+                prevBlock.size += blockToMerge.size;
+                // Start address of prevBlock remains the same
+                memory.splice(currentIndex, 1); // Remove the current block (blockToMerge)
+             }
+        }
+        // No need to re-sort here as merges maintain order relative to neighbors
+    }
+
+    // --- Defragmentation ---
+    function defragmentMemory() {
+        if (simulationRunning) {
+            alert("Please stop the simulation before defragmenting.");
+            return;
+        }
+        console.log("Defragmenting Memory...");
+
+        // Separate allocated and free blocks
+        const allocatedBlocks = dynamicMemory.filter(b => !b.isFree);
+        const totalFreeSize = dynamicMemory
+                                .filter(b => b.isFree)
+                                .reduce((sum, b) => sum + b.size, 0);
+
+        if (totalFreeSize === 0 && dynamicMemory.length === allocatedBlocks.length) {
+            console.log("Memory is fully allocated. No defragmentation needed.");
+            return; // Nothing to defragment
+        }
+         if (dynamicMemory.length - allocatedBlocks.length <= 1 && dynamicMemory.every(b => !b.isFree || (b.isFree && b.startAddress + b.size === TOTAL_MEMORY_SIZE))) {
+             console.log("Memory is already defragmented or has only one hole at the end.");
+            return; // Already effectively defragmented
+         }
+
+
+        let newDynamicMemory = [];
+        let currentAddress = 0;
+
+        // Add allocated blocks consecutively at the top
+        allocatedBlocks.sort((a, b) => a.startAddress - b.startAddress); // Maintain relative order if desired
+        allocatedBlocks.forEach(block => {
+            block.startAddress = currentAddress; // Update start address
+            newDynamicMemory.push(block);
+            currentAddress += block.size;
+        });
+
+        // Add one large free block at the end if there's space
+        if (totalFreeSize > 0) {
+            newDynamicMemory.push({
+                id: `b${nextBlockId++}`, // New ID for the combined hole
+                startAddress: currentAddress,
+                size: totalFreeSize,
+                isFree: true,
+                processId: null
+            });
+        }
+
+        dynamicMemory = newDynamicMemory; // Replace old memory layout
+        console.log("Defragmentation complete.");
+        renderMemory(); // Update the display
+        updateControlButtonStates(); // Update button states (defrag might become disabled if fully compacted)
+    }
+
+
     // --- Simulation Loop ---
     function simulationStep() {
-        console.log("Simulation Tick...");
+        // console.log("Simulation Tick...");
         let processFinished = false;
 
-        // Find all *running* processes (allocated in either memory)
-         // Need a combined list conceptually, or iterate through memory blocks
-         let runningProcessIds = new Set();
-         staticMemory.forEach(b => { if (!b.isFree && b.processId) runningProcessIds.add(b.processId); });
-         dynamicMemory.forEach(b => { if (!b.isFree && b.processId) runningProcessIds.add(b.processId); });
+        // Find running processes by checking allocated blocks in dynamic memory
+        let runningProcessIds = new Set();
+         dynamicMemory.forEach(b => {
+             if (!b.isFree && b.processId) {
+                 runningProcessIds.add(b.processId);
+             }
+         });
 
-
-         // Decrement time for all running processes
+         // Decrement time for running processes
          runningProcessIds.forEach(pid => {
-             const process = findProcessByIdGlobal(pid); // Find the process object
+             const process = findProcessByIdGlobal(pid);
              if (process && process.state === 'running') {
                  process.timeLeft--;
-                 // console.log(`P${pid} time left: ${process.timeLeft}`);
 
                  if (process.timeLeft <= 0) {
-                     console.log(`Process P${pid} finished.`);
+                     console.log(`Process P${pid} (${process.name}) finished.`);
                      processFinished = true;
-
-                     // Store finished process info before deallocation might clear links
-                      const finishedInfo = { ...process };
-
-                     // Deallocate from BOTH static and dynamic if it was in both
-                     if (process.allocatedStaticBlockId) {
-                         deallocateProcessFromMemory(pid, 'static');
-                     }
-                     if (process.allocatedDynamicBlockId) {
-                         deallocateProcessFromMemory(pid, 'dynamic');
-                     }
-
-                      // Add to exited list (only once)
-                      if (!exitedProcesses.some(ep => ep.id === finishedInfo.id)) {
-                         finishedInfo.state = 'finished';
-                         exitedProcesses.push(finishedInfo);
-                         renderExitedList();
-                      }
-
-                      // Mark original process object as finished (though it's effectively gone)
-                      process.state = 'finished';
+                     // Call the simplified deallocate function
+                     deallocateProcess(pid); // This handles state update, render, and re-allocation attempt
                  }
              }
          });
 
 
-        // Re-render memory to show updated timers (only if no process finished, as deallocate handles render then)
+        // Re-render memory to show updated timers ONLY if no process finished
+        // because deallocateProcess handles rendering after finishes.
         if (!processFinished) {
-             renderMemory('static');
-             renderMemory('dynamic');
-        } else {
-            // If a process finished, deallocation called render AND attemptAllocation
-             console.log("Process finished, re-evaluating queue...");
-             // attemptAllocation(); // Deallocation already calls this
+             renderMemory();
         }
+        // Note: attemptAllocation is called inside deallocateProcess if a process finishes
     }
-
-     // Helper for deallocation within the simulation step to avoid async timing issues
-     function deallocateProcessFromMemory(processId, memoryType) {
-         const memory = (memoryType === 'static') ? staticMemory : dynamicMemory;
-         const blockIndex = memory.findIndex(b => b.processId === processId); // Find block by process ID it holds
-
-         if (blockIndex === -1) {
-             // This might happen if called for both static/dynamic but process was only in one
-             // console.warn(`Could not find P${processId} in ${memoryType} memory during deallocation.`);
-             return;
-         }
-
-         const block = memory[blockIndex];
-         console.log(`Deallocating P${processId} from ${memoryType} Block ${block.id} (Simulation Step)`);
-
-         const grid = (memoryType === 'static') ? staticMemoryGrid : dynamicMemoryGrid;
-         const blockDiv = grid.querySelector(`[data-block-id="${block.id}"]`);
-         if (blockDiv) {
-             blockDiv.classList.add('exiting'); // Visual cue
-         }
-
-         block.isFree = true;
-         block.processId = null;
-
-         if (memoryType === 'dynamic') {
-             mergeFreeBlocks(memory, blockIndex);
-         }
-
-          // Schedule render and allocation attempt *after* the current tick logic completes
-          // Use setTimeout 0 to push to end of event loop queue
-          setTimeout(() => {
-              renderMemory(memoryType);
-              attemptAllocation(); // Try to fill the freed space
-          }, 0);
-     }
-
 
     function startSimulation() {
         if (simulationRunning) return;
         simulationRunning = true;
-        // const quantum = parseInt(timeQuantumInput.value) || 1000; // Use selected quantum
-        const quantum = SIMULATION_TICK_MS; // Fixed tick rate
-        simulationInterval = setInterval(simulationStep, quantum);
+        simulationInterval = setInterval(simulationStep, SIMULATION_TICK_MS);
         updateControlButtonStates();
         statusDisplay.textContent = "Status: Running";
         statusDisplay.className = 'status-running';
         console.log("Simulation Started.");
-        // Attempt initial allocation if queue isn't empty
-        attemptAllocation();
+        attemptAllocation(); // Try allocating anything waiting in queue
     }
 
     function stopSimulation() {
@@ -628,108 +525,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Utility Functions ---
-    function findProcessById(processId) {
-         // Search only within the *active* queue or potentially running processes
-         // This needs refinement if processes are removed from queue on allocation.
-         // Let's assume processes stay in a master list or we search memory blocks.
-        // For rendering timers, we need the original process object.
 
-        // Search static memory
-        let block = staticMemory.find(b => b.processId === processId);
-        if (block) {
-             // We need the actual process object, not just the block
-             // Assume processQueue might still hold it, or we need another list
-            return findProcessByIdGlobal(processId); // Use helper
-        }
-
-         // Search dynamic memory
-         block = dynamicMemory.find(b => b.processId === processId);
-         if (block) {
-              return findProcessByIdGlobal(processId); // Use helper
-         }
-
-         return null; // Not found running in memory
-    }
-
-    // Helper to find process object from *anywhere* (queue, exited, implicitly running)
-    // This requires maintaining a master list or searching multiple places.
-    // Let's create a conceptual list of all processes ever added.
-    let allProcesses = []; // Store all added processes here
-    // Modify addProcess to push to allProcesses
-    // Re-implement handleAddProcess slightly:
-    const original_handleAddProcess = handleAddProcess; // Keep reference if needed
-    function handleAddProcess() {
-         // ... (validation code from original handleAddProcess) ...
-        const name = processNameInput.value.trim();
-        const priority = parseInt(processPriorityInput.value);
-        const burstTime = parseInt(processBurstInput.value);
-        const size = parseInt(processSizeInput.value);
-
-        // Basic Validation (copied for completeness)
-        errorMessageDiv.textContent = '';
-        if (!name || isNaN(priority) || priority < 1 || isNaN(burstTime) || burstTime < 1 || isNaN(size) || size < 1) {
-            errorMessageDiv.textContent = 'Invalid input. Please check values.';
-             return;
-        }
-         if (size > TOTAL_MEMORY_SIZE) {
-             errorMessageDiv.textContent = `Process size (${size}KB) exceeds total dynamic memory (${TOTAL_MEMORY_SIZE}KB).`;
-             return;
-         }
-         const maxStaticSize = Math.max(...STATIC_PARTITIONS.map(p => p.size));
-          if (size > maxStaticSize) {
-             console.warn(`Process P${nextProcessId} (${size}KB) is too large for any static partition (Max: ${maxStaticSize}KB).`);
-         }
-
-
-        const newProcess = {
-            id: nextProcessId++,
-            name: name,
-            priority: priority,
-            burstTime: burstTime,
-            size: size,
-            timeLeft: burstTime,
-            state: 'waiting',
-            allocatedBlockId: null, // General - details below
-            memoryType: null,
-            // Add specific allocation tracking needed by revised attemptAllocation
-            allocatedStaticBlockId: null,
-            allocatedDynamicBlockId: null
-        };
-
-        allProcesses.push(newProcess); // Add to master list
-        processQueue.push(newProcess); // Add to waiting queue
-        console.log(`Process Added: ${JSON.stringify(newProcess)}`);
-        renderQueue();
-
-        // Clear form
-        processNameInput.value = '';
-        processPriorityInput.value = '1';
-        processBurstInput.value = '10';
-        processSizeInput.value = '50';
-
-        attemptAllocation();
-    }
-    // Now findProcessByIdGlobal can search allProcesses
+     // Finds process from the master list
      function findProcessByIdGlobal(processId) {
          return allProcesses.find(p => p.id === processId);
      }
 
 
     function updateControlButtonStates() {
+        const isFragmented = dynamicMemory.filter(b => b.isFree).length > 1;
+
         startButton.disabled = simulationRunning;
         stopButton.disabled = !simulationRunning;
-        // Disable algorithm/quantum changes while running?
         allocationAlgorithmSelect.disabled = simulationRunning;
-        // timeQuantumInput.disabled = simulationRunning; // Removed
-        // Optionally disable adding processes while running heavily? For now, allow.
-        // addProcessButton.disabled = simulationRunning;
+        // Enable defrag only when stopped and memory is actually fragmented
+        defragmentButton.disabled = simulationRunning || !isFragmented;
     }
 
 
     // --- Event Listeners ---
-    addProcessButton.addEventListener('click', handleAddProcess); // Use the modified handler
+    addProcessButton.addEventListener('click', handleAddProcess);
     startButton.addEventListener('click', startSimulation);
     stopButton.addEventListener('click', stopSimulation);
+    defragmentButton.addEventListener('click', defragmentMemory); // Added listener
 
     // --- Initial Call ---
     initialize();
