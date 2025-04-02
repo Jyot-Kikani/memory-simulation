@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OS Memory Management Simulation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>OS Memory Management Simulation</h1>
+
+    <div class="controls">
+        <fieldset>
+            <legend>Simulation Settings</legend>
+            <div>
+                <label>Allocation Algorithm:</label>
+                <select id="allocation-algorithm">
+                    <option value="first" selected>First Fit</option>
+                    <option value="best">Best Fit</option>
+                    <option value="worst">Worst Fit</option>
+                </select>
+            </div>
+             <!-- Time Quantum removed as RR is simplified -->
+             <!--
+            <div>
+                <label for="time-quantum">Time Quantum (ms):</label>
+                <input type="number" id="time-quantum" value="1000" min="100">
+            </div>
+             -->
+            <button id="start-button">Start Simulation</button>
+            <button id="stop-button" disabled>Stop Simulation</button>
+             <span id="status" class="status-stopped">Status: Stopped</span>
+        </fieldset>
+
+        <fieldset id="add-process-form">
+            <legend>Add New Process</legend>
+            <div>
+                <label for="process-name">Name:</label>
+                <input type="text" id="process-name" placeholder="e.g., P1">
+            </div>
+            <div>
+                <label for="process-priority">Priority (higher = more):</label>
+                <input type="number" id="process-priority" min="1" value="1">
+            </div>
+            <div>
+                <label for="process-burst">Burst Time (ticks):</label>
+                <input type="number" id="process-burst" min="1" value="10">
+            </div>
+            <div>
+                <label for="process-size">Size (KB):</label>
+                <input type="number" id="process-size" min="1" value="50">
+            </div>
+            <button id="add-process-button">Add to Queue</button>
+            <div id="error-message" class="error"></div>
+        </fieldset>
+    </div>
+
+    <div class="simulation-area">
+        <div class="queue-section">
+            <h2>Process Queue (Priority High -> Low)</h2>
+            <ul id="process-queue-list">
+                <!-- Queue items will be added here -->
+            </ul>
+        </div>
+
+        <div class="memory-section">
+            <div class="memory-container">
+                <h2>Static Partitioning</h2>
+                <div id="static-memory" class="memory-grid">
+                    <!-- Static partitions will be rendered here -->
+                </div>
+                 <div class="memory-info">Total Size: <span id="static-total-size">0</span> KB</div>
+            </div>
+
+            <div class="memory-container">
+                <h2>Dynamic Partitioning</h2>
+                <div id="dynamic-memory" class="memory-grid">
+                    <!-- Dynamic blocks/holes will be rendered here -->
+                </div>
+                 <div class="memory-info">Total Size: <span id="dynamic-total-size">0</span> KB</div>
+            </div>
+        </div>
+         <div class="exited-section">
+            <h2>Exited Processes</h2>
+            <ul id="exited-process-list">
+                <!-- Exited process info will be added here -->
+            </ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

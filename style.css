@@ -1,0 +1,241 @@
+body {
+    font-family: sans-serif;
+    line-height: 1.6;
+    margin: 20px;
+    background-color: #f4f4f4;
+}
+
+h1, h2 {
+    text-align: center;
+    color: #333;
+}
+
+.controls {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    background-color: #e0e0e0;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.controls fieldset {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px 15px;
+    margin: 5px;
+    min-width: 250px;
+}
+
+.controls legend {
+    font-weight: bold;
+    color: #555;
+}
+
+.controls label {
+    display: inline-block;
+    margin-bottom: 5px;
+    min-width: 120px; /* Align labels */
+}
+
+.controls input[type="text"],
+.controls input[type="number"],
+.controls select {
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: calc(100% - 140px); /* Adjust width considering label */
+    box-sizing: border-box;
+}
+
+.controls button {
+    padding: 10px 15px;
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-right: 5px;
+}
+
+.controls button:hover {
+    background-color: #4cae4c;
+}
+
+.controls button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+#stop-button {
+     background-color: #d9534f;
+}
+#stop-button:hover:not(:disabled) {
+     background-color: #c9302c;
+}
+
+.status-running {
+    color: green;
+    font-weight: bold;
+}
+.status-stopped {
+    color: red;
+    font-weight: bold;
+}
+
+.error {
+    color: red;
+    font-size: 0.9em;
+    margin-top: 5px;
+    min-height: 1.2em; /* Prevent layout shifts */
+}
+
+.simulation-area {
+    display: flex;
+    gap: 20px; /* Space between queue, memory, exited */
+    margin-top: 20px;
+    align-items: flex-start; /* Align tops */
+}
+
+.queue-section, .exited-section {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    min-width: 250px;
+    max-width: 300px; /* Limit width */
+}
+
+.queue-section ul, .exited-section ul {
+    list-style-type: none;
+    padding: 0;
+    max-height: 400px; /* Limit height and allow scrolling */
+    overflow-y: auto;
+}
+
+.queue-section li, .exited-section li {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.memory-section {
+    display: flex;
+    flex-grow: 1; /* Allow memory section to take remaining space */
+    gap: 20px;
+}
+
+.memory-container {
+    flex: 1; /* Each memory grid takes equal space */
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column; /* Stack title, grid, info */
+}
+.memory-container h2 {
+    margin-top: 0;
+}
+
+.memory-grid {
+    border: 2px solid #333;
+    height: 500px; /* Fixed height for visualization */
+    position: relative; /* For positioning blocks inside */
+    background: repeating-linear-gradient(
+        45deg,
+        #f0f0f0,
+        #f0f0f0 10px,
+        #e8e8e8 10px,
+        #e8e8e8 20px
+    ); /* Subtle background for empty space */
+     overflow: hidden; /* Hide potential overflow */
+     display: flex; /* Use flexbox to stack blocks */
+     flex-direction: column;
+}
+
+.memory-info {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+
+/* Memory Block Styles */
+.memory-block {
+    border: 1px solid #666;
+    box-sizing: border-box; /* Include border in size */
+    display: flex;
+    flex-direction: column; /* Stack text inside */
+    justify-content: center; /* Center text vertically */
+    align-items: center; /* Center text horizontally */
+    font-size: 0.8em;
+    text-align: center;
+    overflow: hidden; /* Hide overflowing text */
+    position: relative; /* Needed for absolute timer */
+    transition: background-color 0.3s ease, border-color 0.3s ease; /* Smooth transitions */
+}
+
+.memory-block.free {
+    background-color: #c8e6c9; /* Light green for free */
+    border-color: #81c784;
+    color: #388e3c;
+}
+.memory-block.free::before {
+     content: "Free";
+     font-weight: bold;
+}
+
+
+.memory-block.allocated {
+    background-color: #bbdefb; /* Light blue for allocated */
+    border-color: #64b5f6;
+    color: #1976d2;
+    cursor: default; /* Indicate it's occupied */
+    font-weight: bold;
+}
+
+.memory-block .process-info {
+    width: 100%;
+}
+
+.memory-block .process-timer {
+    font-size: 0.9em;
+    color: #d32f2f; /* Red for timer */
+    font-weight: normal;
+    margin-top: 3px;
+}
+
+/* Style for static partitions that cannot be changed */
+.memory-block.static-partition.allocated {
+     background-color: #a5d6a7; /* Slightly different green for static allocated */
+     border-color: #4caf50;
+     color: #2e7d32;
+}
+.memory-block.static-partition.free {
+     background-color: #e0e0e0; /* Grey for free static */
+     border-color: #bdbdbd;
+     color: #616161;
+}
+.memory-block.static-partition.free::before {
+     content: "Partition Free";
+}
+
+
+/* Minimalistic Exit Animation (Color Flash) */
+.memory-block.exiting {
+    animation: exitFlash 0.5s ease-out;
+}
+
+@keyframes exitFlash {
+    0% { background-color: #ffcdd2; border-color: #ef9a9a; } /* Flash red */
+    100% { /* Returns to original free color via JS update */ }
+}
